@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"os"
 
@@ -23,43 +24,46 @@ func VerifyWebhook(c *gin.Context) {
 
 
 func HandleWebhook(c *gin.Context) {
-	var payload models.WhatsAppWebhook
+    var payload models.WhatsAppWebhook
 
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
-		return
-	}
+    if err := c.ShouldBindJSON(&payload); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+        return
+    }
 
-	for _, entry := range payload.Entry {
-		for _, change := range entry.Changes {
-			if change.Value.Messages == nil {
-				continue
-			}
+    for _, entry := range payload.Entry {
+        for _, change := range entry.Changes {
+            if change.Value.Messages == nil {
+                continue
+            }
 
-			for _, msg := range change.Value.Messages {
-				phone := msg.From
-				var err error
+            for _, msg := range change.Value.Messages {
+                phone := msg.From
+                var err error
 
-				switch msg.Type {
-				case "text":
-					if msg.Text != nil {
-						err = service.ProcessSimpleText(phone, msg.Text.Body)
-					}
-				case "interactive":
-					if msg.Interactive != nil && msg.Interactive.ListReply != nil {
-						id := msg.Interactive.ListReply.ID
-						err = service.ProcessMenuOption(phone, id)
-					}
-				default:
-					_ = service.SendErrorMenu(phone)
-				}
+                log.Printf("Processing message from: %s", phone)
 
-				if err != nil {
-					_ = service.SendErrorMenu(phone)
-				}
-			}
-		}
-	}
+                switch msg.Type {
+                case "text":
+                    if msg.Text != nil {
+                        err = service.ProcessSimpleText(phone, msg.Text.Body)
+                    }
+                case "interactive":
+                    if msg.Interactive != nil && msg.Interactive.ListReply != nil {
+                        id := msg.Interactive.ListReply.ID
+                        err = service.ProcessMenuOption(phone, id)
+                    }
+                default:
+                    err = service.SendErrorMenu(phone)
+                }
 
-	c.Status(http.StatusOK)
+                if err != nil {
+                    log.Printf("Error processing message: %v", err)
+                    _ = service.SendErrorMenu(phone)
+                }
+            }
+        }
+    }
+
+    c.Status(http.StatusOK)
 }

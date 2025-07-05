@@ -11,9 +11,9 @@ package models
 	type WhatsAppInteractiveBlock struct {
 		Type   string                     `json:"type"`
 		Header *WhatsAppHeader            `json:"header,omitempty"`
-		Body   WhatsAppTextBlock          `json:"body"`
+		Body   *WhatsAppTextBlock          `json:"body"`
 		Footer *WhatsAppTextBlock         `json:"footer,omitempty"`
-		Action WhatsAppListMessageAction  `json:"action"`
+		Action *WhatsAppListMessageAction  `json:"action"`
 	}
 
 	type WhatsAppHeader struct {
