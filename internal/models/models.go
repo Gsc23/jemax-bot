@@ -7,57 +7,92 @@ import (
 	"gorm.io/gorm"
 )
 
+// ================== BASE MODEL =====================
+
 type Model struct {
-	CreatedAt time.Time      `json:"created_at" gorm:"not null"`
-	UpdatedAt time.Time      `json:"updated_at" gorm:"not null"`
-	DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
-// ================== USER =====================
+// ================== CUSTOMER =====================
 
-type User struct {
+type Customer struct {
 	Model
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Phonenumber string    `gorm:"unique;not null"`
-	Status      string
-	IsAdmin     bool
+	Phone string   `gorm:"uniqueIndex;not null"` 
+	Order []*Order 
 }
 
 // ================== ORDER =====================
 
 type Order struct {
 	Model
-	ID          uuid.UUID     `gorm:"type:uuid;primaryKey"`
-	Phonenumber string        `gorm:"not null"`
-	Items       []*OrderItem   `gorm:"foreignKey:OrderID"`
+	CustomerID uuid.UUID    `gorm:"not null"`
+	Customer   *Customer    
+	Status     string       `gorm:"not null;default:'pendente'"`
+	Items      []*OrderItem `gorm:"foreignKey:OrderID"` 
+	TotalPrice int32        `gorm:"not null;default:0"` 
 }
 
-// ================== ITEM =====================
-
-type Item struct {
-	Model
-	ID    uuid.UUID   `gorm:"type:uuid;primaryKey"`
-	Name  string
-	Stock int         // estoque total
-	Orders []*OrderItem `gorm:"foreignKey:ItemID"`
-}
-
-// =============== ORDER_ITEM ==================
+// ================== ORDER ITEM =====================
 
 type OrderItem struct {
-	Model
-	OrderID    uuid.UUID
-	Order      Order
-	ItemID     uuid.UUID
-	Item       Item
-	Quantity   int64
+	OrderID   uuid.UUID `gorm:"primaryKey"`
+	ProductID uuid.UUID `gorm:"primaryKey"`
+	Product   *Product
+	Quantity  int32 `gorm:"not null"`
+	UnitPrice int32 `gorm:"not null"`
 }
 
-// ================== STORAGE =====================
+// ================== INGREDIENT =====================
 
-type Storage struct {
+type Ingredient struct {
 	Model
-	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Name     string
-	Quantity int
+	Name            string `gorm:"uniqueIndex;not null"` 
+	QuantityInStock int32  `gorm:"not null;default:0"`   
+	Unit            string `gorm:"not null"`             
+}
+
+// ================== PRODUCT =====================
+
+type Product struct {
+	Model
+	SKU         string `gorm:"uniqueIndex;not null"`
+	Name        string `gorm:"not null"`
+	Description string
+	Price       int32 `gorm:"not null"` // Preço em centavos
+	IsAvailable bool  `gorm:"default:true"`
+	Ingredients []*ProductIngredient
+}
+
+// ================== PRODUCT INGREDIENT (RECEITA) =====================
+
+type ProductIngredient struct {
+	ProductID        uuid.UUID   `gorm:"primaryKey"`
+	IngredientID     uuid.UUID   `gorm:"primaryKey"`
+	Ingredient       *Ingredient `gorm:"foreignKey:IngredientID"`
+	QuantityRequired int32       `gorm:"not null"`
+}
+
+// ================= PROMOTION ====================
+
+type Promotion struct {
+	Model
+	Name        string `gorm:"not null"`
+	Description string
+	Value       int32               `gorm:"not null"`
+	StartDate   time.Time           `gorm:"not null"`
+	EndDate     time.Time           `gorm:"not null"`
+	IsActive    bool                `gorm:"default:true"`
+	Items       []*PromotionProduct `gorm:"foreignKey:PromotionID"` 
+}
+
+// ============== PROMOTION_PRODUCT =================
+
+type PromotionProduct struct {
+	PromotionID uuid.UUID `gorm:"primaryKey"`
+	ProductID   uuid.UUID `gorm:"primaryKey"`
+	Product     *Product
+	Quantity    int32 `gorm:"not null"`
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -15,29 +16,28 @@ import (
 )
 
 var (
-	WhatsAppToken = "EAARsZAA1hFIIBPAvyytkZCG6H2D2UXUheHXGJgfSz76voCkX3ASIgkl0yshR8a7P97XS7GW1D4juCYjmAnd2JMhveZCua6NPzGZCicNPa0bf9fenrHyIZA8h0DceZCJZAFfqjY0NUb0mNwrQska7O9yn5yyhsvJV6VHcwY47acOMUO2bhMserhedPiBG5yw4rzibVAkeoof23r076OrypT2vBW4T4gWhQC7DFZBE9qYhtj7g5AZDZD"
-	WhatsAppPhoneID = "671700972697735"
-	apiClient = &http.Client{Timeout: 10 * time.Second} 
+	WhatsAppToken   = os.Getenv("WHATSAPP_ACCESS_TOKEN")
+	WhatsAppPhoneID = os.Getenv("WHATSAPP_PHONE_ID")
+	apiClient       = &http.Client{Timeout: 10 * time.Second}
 )
 
 const (
-    GraphAPIVersion = "v18.0"
-    GraphAPIBaseURL = "https://graph.facebook.com"
+	GraphAPIVersion = "v18.0"
+	GraphAPIBaseURL = "https://graph.facebook.com"
 )
 
 func ProcessSimpleText(phone, text string) error {
-    text = strings.TrimSpace(strings.ToLower(text))
+	text = strings.TrimSpace(strings.ToLower(text))
 
-    if helper.ContainsAnyWord(text, []string{"humano", "atendente", "falar com"}) {
-        return sendTextMessage(phone, helper.MsgSeller)
-    }
-
+	if helper.ContainsAnyWord(text, []string{"humano", "atendente", "falar com"}) {
+		return sendTextMessage(phone, helper.MsgSeller)
+	}
 
 	if text != "" {
 		return sendInteractiveMenu(phone)
 	}
 
-    return nil
+	return nil
 }
 
 func sendTextMessage(phone string, msg *helper.Msg) error {
@@ -59,7 +59,7 @@ func sendInteractiveMenu(phone string) error {
 		To:               phone,
 		Type:             "interactive",
 		Interactive: models.WhatsAppInteractiveBlock{
-			Type: "list",
+			Type:   "list",
 			Header: &models.WhatsAppHeader{Type: "text", Text: "JeMax Burger 🍔"},
 			Body:   &models.WhatsAppTextBlock{Text: "Como podemos te ajudar hoje?"},
 			Footer: &models.WhatsAppTextBlock{Text: "Atendemos das 18h às 23h."},
@@ -85,7 +85,11 @@ func sendInteractiveMenu(phone string) error {
 func ProcessMenuOption(phone, optionId string) error {
 	switch optionId {
 	case "fazer_pedido":
-		return sendTextMessage(phone, helper.MsgWellcome)
+		if err := sendTextMessage(phone, helper.MsgWellcome); err != nil {
+			log.Printf("Error sending wellcome message for %s: %v", phone, err)
+			return err
+		}
+		return startOrder(phone)
 	case "atendimento_humano":
 		return sendTextMessage(phone, helper.MsgSeller)
 	case "mostrar_cardapio":
@@ -95,6 +99,8 @@ func ProcessMenuOption(phone, optionId string) error {
 	default:
 		return errors.New("opcao invalida")
 	}
+
+	return nil
 }
 
 func SendErrorMenu(phone string) error {
@@ -105,40 +111,40 @@ func SendErrorMenu(phone string) error {
 }
 
 func send(token, phoneID string, payload interface{}) error {
-    url := fmt.Sprintf("%s/%s/%s/messages", GraphAPIBaseURL, GraphAPIVersion, phoneID)
-    log.Printf("Sending request for: %s", url)
+	url := fmt.Sprintf("%s/%s/%s/messages", GraphAPIBaseURL, GraphAPIVersion, phoneID)
+	log.Printf("Sending request for: %s", url)
 
-    jsonData, err := json.Marshal(payload)
-    if err != nil {
-        log.Printf("JSON Marshal Error: %v", err)
-        return err
-    }
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("JSON Marshal Error: %v", err)
+		return err
+	}
 
-    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-    if err != nil {
-        log.Printf("Request Error: %v", err)
-        return err
-    }
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Authorization", "Bearer "+token)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Request Error: %v", err)
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
-    resp, err := apiClient.Do(req)
-    if err != nil {
-        log.Printf("Error at Http Call: %v", err)
-        return err
-    }
-    defer resp.Body.Close()
+	resp, err := apiClient.Do(req)
+	if err != nil {
+		log.Printf("Error at Http Call: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
 
-    log.Printf("Meta API Response: Status %s", resp.Status)
+	log.Printf("Meta API Response: Status %s", resp.Status)
 
-    if resp.StatusCode >= 400 {
-        buf := new(bytes.Buffer)
-        buf.ReadFrom(resp.Body)
-        responseBody := buf.String()
-        log.Printf("Error from Meta API: %s", responseBody)
-        return fmt.Errorf("error sending message: %s", responseBody)
-    }
+	if resp.StatusCode >= 400 {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		responseBody := buf.String()
+		log.Printf("Error from Meta API: %s", responseBody)
+		return fmt.Errorf("error sending message: %s", responseBody)
+	}
 
-    log.Println("Message sent!")
-    return nil
+	log.Println("Message sent!")
+	return nil
 }

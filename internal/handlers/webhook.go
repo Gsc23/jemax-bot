@@ -3,19 +3,21 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gsc23/jemax-bot/internal/models"
 	"github.com/gsc23/jemax-bot/internal/service"
+	"github.com/gsc23/jemax-bot/pkg/app"
 )
 
 func VerifyWebhook(c *gin.Context) {
-	mode := c.Query("hub.mode")
+	verifyToken := app.VerifyToken(c)
+
+    mode := c.Query("hub.mode")
 	token := c.Query("hub.verify_token")
 	challenge := c.Query("hub.challenge")
 
-	if mode == "subscribe" && token == os.Getenv("WHATSAPP_VERIFY_TOKEN") {
+	if mode == "subscribe" && token == verifyToken {
 		c.String(http.StatusOK, challenge)
 	} else {
 		c.AbortWithStatus(http.StatusForbidden)
